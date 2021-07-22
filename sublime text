@@ -1,0 +1,22 @@
+/*********************************************************************
+Setup Ruby
+Download Ruby without DevKit
+Open Command Prompt with Ruby
+Run  ruby -v to check version
+Run gem install sass
+
+
+Setup Download Sublime Text 4
+Install Package Control (CTRL+SHIFT+P)
+Install these packages: emmet, sass, sass build, scss, SublimeOnSaveBuild
+
+
+Modify Indentation
+under Preferences -> Settings add:
+"tab_size": 2,
+"translate_tabs_to_spaces": true
+
+Aslo under Preferences - Keybindings
+add
+{ "keys": ["ctrl+]"], "command": "reindent"} 
+**********************************************************************/
