@@ -8,7 +8,7 @@ Run gem install sass
 
 Setup Download Sublime Text 4
 Install Package Control (CTRL+SHIFT+P)
-Install these packages: emmet, sass, sass build, scss, SublimeOnSaveBuild
+Install these packages: emmet, sass, sass build, scss, SublimeOnSaveBuild, Color Highlight, RegReplace
 
 
 Modify Indentation
@@ -19,4 +19,43 @@ under Preferences -> Settings add:
 Aslo under Preferences - Keybindings
 add
 { "keys": ["ctrl+]"], "command": "reindent"} 
+
+
+Reg replace alows to strip down html tags from content copied form word or other site and reformat html5 ready to paste into a standard WYSIWYG
+To configure, go under preferences > packages settings > reg replace > rule user
+Paste this code:
+{
+    "replacements": {
+        "remove_html_elements": {
+            "find": "(<\/?div[^>]*>|<\/?span[^>]*>|<\/?section[^>]*>|<\/?table[^>]*>|id=\"[^\"]*\"|class=\"[^\"]*\"|style=\"[^\"]*\")",
+            "replace": "",
+            "greedy": true
+        },
+        "convert_b_to_strong": {
+            "find": "<b>",
+            "replace": "<strong>"
+        },
+        "convert_b_to_strong_closing": {
+            "find": "<\/b>",
+            "replace": "</strong>"
+        }
+    }
+}
+
+Then, go under preferences > packages settings > reg replace > keybinding user
+paste this code:
+[
+    {
+        "keys": ["ctrl+shift+r"],
+        "command": "reg_replace",
+        "args": {
+            "replacements": ["remove_html_elements", "convert_b_to_strong", "convert_b_to_strong_closing"]
+        }
+    }
+]
+
+
+
+
+
 **********************************************************************/
