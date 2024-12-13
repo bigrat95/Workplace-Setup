@@ -157,4 +157,12 @@ class ClearUnusedJsHighlightsCommand(sublime_plugin.TextCommand):
 
 
 
+
+Ru sublime on build : 
+Tools - Build System - New Build System and past below code.
+{
+    "cmd":["C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe","$file"]
+}
+
+
 **********************************************************************/
