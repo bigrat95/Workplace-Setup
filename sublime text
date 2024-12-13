@@ -55,6 +55,105 @@ paste this code:
 ]
 
 
+Création unused JS Finder dans tools > dev > Plugins...
+
+import sublime
+import sublime_plugin
+import os
+import re
+
+UJSF_IS_ACTIVE = {}
+ALLOWED_EXTENSIONS = ["html", "php", "xhtml", "js"]
+
+class HighlightUnusedJsCommand(sublime_plugin.TextCommand):
+    def run(self, edit, **args):
+        self.debug = args.get('debug', False)
+        sublime.set_timeout_async(self.async_search, 1)
+
+    def load_plugin_setting(self, setting_name, default_val):
+        # Load settings from the plugin's configuration
+        plugin_settings = sublime.load_settings('UnusedJsFinder.sublime-settings')
+        setting_value = plugin_settings.get(setting_name, default_val)
+        return setting_value
+
+    def async_search(self):
+        # Step 1: Extract function names from the current JS file
+        js_content = self.view.substr(sublime.Region(0, self.view.size()))
+        function_pattern = r"function\s+(\w+)\s*\(|(\w+)\s*=\s*\(\)\s*=>|(\w+)\s*:\s*function"
+        functions = re.findall(function_pattern, js_content)
+        function_names = [fn[0] or fn[1] or fn[2] for fn in functions]
+
+        print("Detected functions in JS file:", function_names)  # Debugging
+
+        if not function_names:
+            sublime.message_dialog("No functions found in the current file.")
+            return
+
+        # Step 2: Identify all files in the open folder
+        folder = os.path.dirname(self.view.file_name() or "")
+        if not folder:
+            sublime.message_dialog("Please save the file to analyze its folder.")
+            return
+
+        file_paths = self.get_all_files(folder)
+        print("Files being scanned:", file_paths)  # Debugging
+
+        # Step 3: Search for unused functions
+        used_functions = self.search_in_files(file_paths, function_names, self.view.file_name())
+        print("Used functions detected:", used_functions)  # Debugging
+
+        # Step 4: Highlight unused functions
+        unused_functions = [fn for fn in function_names if fn.lower() not in map(str.lower, used_functions)]
+        print("Unused functions detected:", unused_functions)  # Debugging
+        self.highlight_unused_functions(unused_functions)
+
+    def get_all_files(self, folder):
+        """Get all files in the folder with allowed extensions."""
+        allowed_files = []
+        for root, _, files in os.walk(folder):
+            for file in files:
+                if any(file.endswith(ext) for ext in ALLOWED_EXTENSIONS):
+                    allowed_files.append(os.path.join(root, file))
+        return allowed_files
+
+    def search_in_files(self, file_paths, function_names, current_file):
+        """Search for function names in the specified files, excluding the current JS file."""
+        used_functions = set()
+        for file_path in file_paths:
+            if file_path == current_file:
+                continue  # Skip the current JS file
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    file_content = f.read().lower()  # Normalize to lowercase for case-insensitive matching
+                    for fn in function_names:
+                        if fn.lower() in file_content:
+                            print(f"Function {fn} found in {file_path}")  # Debugging
+                            used_functions.add(fn)
+            except Exception as e:
+                if self.debug:
+                    print(f"Error reading {file_path}: {e}")
+        return used_functions
+
+    def highlight_unused_functions(self, unused_functions):
+        """Highlight unused functions in the current JS file."""
+        if unused_functions:
+            regions = []
+            for fn in unused_functions:
+                matches = self.view.find_all(r"\b" + re.escape(fn) + r"\b")
+                regions.extend(matches)
+
+            self.view.add_regions(
+                "unused_js", regions, "region.redish", "circle", sublime.DRAW_NO_OUTLINE
+            )
+            sublime.message_dialog(
+                f"Highlighted {len(unused_functions)} unused functions in your JavaScript file."
+            )
+        else:
+            sublime.message_dialog("No unused functions found!")
+
+class ClearUnusedJsHighlightsCommand(sublime_plugin.TextCommand):
+    def run(self, edit):
+        self.view.erase_regions("unused_js")
 
 
 
