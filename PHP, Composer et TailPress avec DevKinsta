@@ -1,13 +1,17 @@
 # Guide d'installation complète : PHP, Composer et TailPress avec DevKinsta
 
-Ce guide documente l'installation complète de PHP, Composer et la configuration de TailPress dans un environnement DevKinsta sur Windows.
+Ce guide documente l'installation complète de PHP, Composer, TailPress et l'automatisation DevKinsta sur Windows.
 
 ## Prérequis
 
 - Windows 10/11
 - DevKinsta installé et fonctionnel
-- Docker Desktop installé et démarré
+- Docker Desktop (WSL2 activé)
 - Node.js installé (v24.11.0 ou supérieur)
+- Composer installé
+- PHP CLI disponible (par ex. `C:\\php\\php.exe`)
+
+---
 
 ## 1. Installation de PHP sur Windows
 
@@ -15,15 +19,15 @@ Ce guide documente l'installation complète de PHP, Composer et la configuration
 
 1. Aller sur https://windows.php.net/download/
 2. Télécharger **PHP 8.3 (ou 8.5) VS16/VS17 x64 Non Thread Safe (NTS)** - version **Zip**
-3. Extraire le contenu du ZIP dans `C:\php`
+3. Extraire le contenu du ZIP dans `C:\\php`
 
 ### 1.2 Ajouter PHP au PATH Windows
 
 1. Ouvrir "Variables d'environnement" (rechercher dans le menu Démarrer)
-2. Dans "Variables système", cliquer sur "Path" puis "Modifier"
-3. Cliquer "Nouveau" et ajouter : `C:\php`
-4. Cliquer "OK" partout
-5. **Redémarrer PowerShell** pour que les changements prennent effet
+2. Dans "Variables système", cliquer sur **Path** puis **Modifier**
+3. Cliquer **Nouveau** et ajouter : `C:\\php`
+4. Valider avec **OK** partout
+5. **Redémarrer PowerShell**
 
 ### 1.3 Vérifier l'installation de PHP
 
@@ -32,232 +36,243 @@ php -v
 ```
 
 Vous devriez voir quelque chose comme :
-```
+
+```text
 PHP 8.5.0 (cli) (built: Nov 19 2025 09:56:40) (NTS Visual C++ 2022 x64)
 ```
+
+---
 
 ## 2. Installation de Composer
 
 ### 2.1 Télécharger l'installateur Composer
 
-1. Télécharger l'installateur depuis : https://getcomposer.org/Composer-Setup.exe
+1. Télécharger : https://getcomposer.org/Composer-Setup.exe
 2. Exécuter l'installateur
 
 ### 2.2 Configuration de l'installateur
 
-1. Quand l'installateur demande "Choose your command line PHP", cliquer sur "Browse"
-2. Naviguer vers `C:\php` et sélectionner `php.exe`
-3. Choisir le **mode développeur (Developer mode)** lors de l'installation
-4. Laisser l'installateur terminer l'installation
+1. Quand l'installateur demande "Choose your command line PHP", cliquer sur **Browse**
+2. Sélectionner `C:\\php\\php.exe`
+3. Choisir le **mode développeur (Developer mode)**
+4. Laisser l'installateur terminer
 
 ### 2.3 Vérifier l'installation de Composer
 
-**Redémarrer PowerShell** après l'installation, puis :
+Après redémarrage de PowerShell :
 
 ```powershell
 composer --version
 ```
 
-Vous devriez voir :
-```
+Exemple :
+
+```text
 Composer version 2.9.2 2025-11-19 21:57:25
-PHP version 8.5.0 (C:\php\php.exe)
+PHP version 8.5.0 (C:\\php\\php.exe)
 ```
 
-### 2.4 Installer l'installateur TailPress globalement (optionnel)
+---
+
+## 3. Politique d'exécution PowerShell
+
+Pour permettre l'exécution de scripts npm :
 
 ```powershell
-composer global require tailpress/installer
-```
-
-## 3. Configuration de la politique d'exécution PowerShell
-
-Pour permettre l'exécution de scripts npm, modifier la politique d'exécution :
-
-**Ouvrir PowerShell en tant qu'administrateur** et exécuter :
-
-```powershell
+# PowerShell lancé en tant qu'administrateur
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
-Confirmer avec "Y" (Yes) quand demandé.
+Répondre **Y** lorsqu'on vous le demande.
 
-## 4. Installation et compilation de TailPress
+---
 
-### 4.1 Mapper le chemin WSL vers un lecteur Windows
+## 4. Mapping DevKinsta (WSL) sur un lecteur Windows
 
-Les chemins UNC (`\\wsl.localhost\...`) ne sont pas supportés par npm. Il faut mapper le chemin vers un lecteur Windows :
+Les chemins UNC (`\\wsl.localhost\\...`) posent problème pour npm. On mappe donc sur `Z:` :
 
 ```powershell
 net use Z: \\wsl.localhost\docker-desktop-data
 ```
 
-**Note :** Ce lecteur restera mappé jusqu'au redémarrage de Windows. Si vous devez le remapper plus tard, réexécutez cette commande.
+DevKinsta place les sites ici :
 
-### 4.2 Naviguer vers le thème TailPress
+```text
+Z:\data\docker\volumes\DevKinsta\public\<nom-du-site>
+```
+
+En cas de redémarrage de Windows, remapper avec la même commande.
+
+---
+
+## 5. Installation de TailPress dans un site DevKinsta
+
+Exemple avec un site DevKinsta nommé `tailpress` :
 
 ```powershell
 cd Z:\data\docker\volumes\DevKinsta\public\tailpress\wp-content\themes\tailpress
 ```
 
-**Remplacez `tailpress` par le nom de votre site DevKinsta si différent.**
-
-### 4.3 Installer les dépendances npm
+### 5.1 Installer les dépendances npm
 
 ```powershell
 npm install
 ```
 
-Cette commande va installer :
-- Tailwind CSS
-- Vite
-- Autoprefixer
-- PostCSS
-- Et toutes les autres dépendances listées dans `package.json`
-
-### 4.4 Compiler les assets pour la production
+### 5.2 Compiler les assets (production)
 
 ```powershell
 npm run build
 ```
 
-Cette commande va :
-- Compiler Tailwind CSS en CSS optimisé
-- Compiler les fichiers JavaScript
-- Créer le dossier `dist/` avec les assets compilés
+Cela génère :
 
-Vous devriez voir une sortie similaire à :
-```
-vite v5.4.21 building for production...
-✓ 2 modules transformed.
-dist/.vite/manifest.json         0.30 kB │ gzip: 0.13 kB
-dist/css/resources/css/app.css  32.16 kB │ gzip: 5.46 kB
-dist/js/resources/js/app.js.js   0.04 kB │ gzip: 0.06 kB
-✓ built in 5.12s
-```
+- `dist/.vite/manifest.json`
+- `dist/assets/app-XXXX.css`
+- `dist/assets/app-XXXX.js`
 
-## 5. Vérification de l'installation
-
-### 5.1 Vérifier que le dossier dist existe
+### 5.3 Vérifier le dossier dist
 
 ```powershell
 ls dist
 ```
 
-Vous devriez voir :
-- `dist/.vite/manifest.json`
-- `dist/css/resources/css/app.css`
-- `dist/js/resources/js/app.js.js`
-
-### 5.2 Activer le thème dans WordPress
-
-1. Se connecter à l'administration WordPress de votre site DevKinsta
-2. Aller dans **Apparence > Thèmes**
-3. Activer le thème **TailPress**
-
-## 6. Commandes utiles pour le développement
-
-### Recompiler les assets après modification
-
-```powershell
-# S'assurer que le lecteur Z: est mappé
-net use Z: \\wsl.localhost\docker-desktop-data
-
-# Naviguer vers le thème
-cd Z:\data\docker\volumes\DevKinsta\public\tailpress\wp-content\themes\tailpress
-
-# Recompiler
-npm run build
-```
-
-### Mode développement avec hot reload (optionnel)
-
-Pour le développement avec rechargement automatique :
-
-```powershell
-npm run dev
-```
-
-Cela démarre le serveur Vite sur `http://localhost:3000` avec hot module replacement.
-
-**Note :** Le mode développement peut avoir des problèmes de stabilité avec WSL selon la communauté Kinsta. La compilation en production (`npm run build`) est plus fiable.
-
-## 7. Dépannage
-
-### Problème : "npm install" échoue avec erreur UNC
-
-**Solution :** Mapper le chemin WSL vers un lecteur Windows (voir section 4.1)
-
-### Problème : "composer" n'est pas reconnu
-
-**Solution :** 
-1. Vérifier que PHP est installé : `php -v`
-2. Redémarrer PowerShell après l'installation de Composer
-3. Vérifier le PATH : `where composer`
-
-### Problème : "php" n'est pas reconnu
-
-**Solution :**
-1. Vérifier que PHP est dans `C:\php`
-2. Vérifier que `C:\php` est dans le PATH Windows
-3. Redémarrer PowerShell
-
-### Problème : Le lecteur Z: n'est plus accessible
-
-**Solution :** Remapper le lecteur :
-```powershell
-net use Z: \\wsl.localhost\docker-desktop-data
-```
-
-### Problème : npm install échoue dans le conteneur Docker
-
-**Solution :** Utiliser la méthode de compilation locale (section 4) au lieu d'installer npm dans le conteneur, car :
-- Les conteneurs DevKinsta peuvent avoir des problèmes de connexion réseau
-- Les chemins UNC ne fonctionnent pas avec npm
-- La compilation locale est plus fiable
-
-## 8. Structure du projet après installation
-
-```
-wp-content/themes/tailpress/
-├── dist/                          # Assets compilés (créé par npm run build)
-│   ├── .vite/
-│   │   └── manifest.json
-│   ├── css/
-│   │   └── resources/css/app.css
-│   └── js/
-│       └── resources/js/app.js.js
-├── node_modules/                  # Dépendances npm (créé par npm install)
-├── resources/                     # Fichiers sources
-│   ├── css/
-│   │   ├── app.css
-│   │   └── editor-style.css
-│   └── js/
-│       └── app.js
-├── package.json                   # Configuration npm
-├── tailwind.config.js            # Configuration Tailwind CSS
-├── vite.config.js                # Configuration Vite
-└── functions.php                 # Fonctions WordPress du thème
-```
-
-## 9. Notes importantes
-
-- **Composer** est utilisé pour les dépendances PHP (comme le framework TailPress optionnel)
-- **npm** est utilisé pour compiler Tailwind CSS et les assets JavaScript
-- Les deux sont nécessaires pour que TailPress fonctionne correctement
-- Le lecteur Z: doit être mappé pour que npm fonctionne avec les chemins WSL
-- La compilation en production (`npm run build`) est plus fiable que le mode développement avec WSL
-
-## 10. Références
-
-- [Documentation PHP Windows](https://windows.php.net/download/)
-- [Documentation Composer](https://getcomposer.org/doc/)
-- [Documentation TailPress](https://tailpress.io)
-- [Support DevKinsta - Composer](https://community.kinsta.com/t/support-for-composer/1041)
-- [Support DevKinsta - NPM](https://community.kinsta.com/t/npm-watch-stops-automatically-after-wsl/681)
+Vous devriez voir les fichiers `app-*.css` et `app-*.js` dans `dist/assets/`.
 
 ---
 
-**Date de création :** 24 novembre 2025  
-**Environnement testé :** Windows 11, DevKinsta, Docker Desktop avec WSL2
+## 6. Activer TailPress dans WordPress (DevKinsta)
 
+1. Ouvrir l'admin : `https://<site>.local/wp-admin`
+2. Aller dans **Apparence > Thèmes**
+3. Activer le thème **TailPress**
+
+Assurez-vous que les assets (`dist/`) existent avant d'activer le thème.
+
+---
+
+## 7. Automatisation PowerShell DevKinsta
+
+Pour éviter de répéter les mêmes commandes, on utilise un **profil PowerShell** global.
+
+### 7.1 Emplacement du profil
+
+```text
+C:\Users\<Utilisateur>\OneDrive\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1
+```
+
+Sur la machine de référence :
+
+```text
+C:\Users\olivi\OneDrive\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1
+```
+
+Ce profil :
+
+- Ajoute `C:\php` au `PATH`
+- Monte automatiquement `Z:` sur `\\wsl.localhost\docker-desktop-data`
+- Convertit les chemins UNC vers `Z:`
+- Détecte un projet DevKinsta (présence de `wp-content`, `themes`, `package.json`, `vite.config.*`, `composer.json`)
+- Détecte TailPress / Tailwind / Composer
+- Fournit des commandes pratiques :
+  - `devkinsta-status`
+  - `devkinsta-build`
+  - `devkinsta-dev`
+  - `devkinsta-help`
+
+> Pour une nouvelle machine, il suffit de **copier ce fichier** au même emplacement pour retrouver ces commandes.
+
+### 7.2 Commandes disponibles
+
+- `devkinsta-status`
+  - Vérifie : Z:, Node, npm, Composer, PHP
+  - Détecte le projet WP/TailPress
+
+- `devkinsta-build`
+  - Dans le thème actif :
+    - `composer install` si `vendor/` manquant
+    - `npm install` si `node_modules/` manquant
+    - `npm run build` (Vite/TailPress)
+
+- `devkinsta-dev`
+  - Dans le thème actif :
+    - `npm install` si besoin
+    - `npm run dev` (serveur Vite ou script `watch`)
+
+- `devkinsta-help`
+  - Récapitulatif des commandes.
+
+---
+
+## 8. Intégration Windsurf / VS Code
+
+Dans la racine du site DevKinsta :
+
+```text
+Z:\data\docker\volumes\DevKinsta\public\<site>\.vscode\
+```
+
+### 8.1 `.vscode/settings.json`
+
+- Définit PowerShell comme terminal par défaut.
+- Définit le **cwd** du terminal sur la racine du projet.
+- Charge le profil PowerShell avec `-NoExit -Command ". $PROFILE"`.
+- Configure :
+  - `php.validate.executablePath` (`C:\\php\\php.exe`)
+  - IntelliSense Tailwind CSS pour les fichiers PHP.
+
+### 8.2 `.vscode/tasks.json`
+
+Tâches typiques :
+
+- `DevKinsta: Status` → `. $PROFILE; devkinsta-status`
+- `DevKinsta: Full Build` → `. $PROFILE; devkinsta-build`
+- `DevKinsta: Dev Server` → `. $PROFILE; devkinsta-dev`
+
+Ainsi que des tâches directes `npm install`, `npm run build`, `composer install` dans le thème.
+
+Sur une nouvelle machine, copier `.vscode/` et ajuster si besoin le chemin vers PHP.
+
+---
+
+## 9. Workflow complet sur une nouvelle machine
+
+1. Installer : PHP (`C:\\php`), Composer, Node, DevKinsta, Docker (WSL2).
+2. Copier le profil PowerShell dans :
+
+   ```text
+   C:\Users\<Utilisateur>\OneDrive\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1
+   ```
+
+3. Ouvrir Windsurf sur le site DevKinsta monté :
+
+   ```text
+   Z:\data\docker\volumes\DevKinsta\public\<site>
+   ```
+
+4. Copier :
+   - le thème TailPress complet (`wp-content/themes/tailpress`)
+   - le dossier `.vscode/`
+
+5. Dans le terminal :
+
+   ```powershell
+   devkinsta-status
+   devkinsta-build
+   # pour le dev
+   devkinsta-dev
+   ```
+
+6. Ouvrir `https://<site>.local/` dans le navigateur (DevKinsta) et développer.
+
+---
+
+## 10. Résumé
+
+- PHP + Composer gèrent les dépendances backend (TailPress Framework, etc.).
+- Node + npm + Vite gèrent Tailwind CSS et les assets JS.
+- DevKinsta fournit l'environnement WordPress via Docker + WSL2.
+- Un profil PowerShell centralise le montage de Z:, la détection DevKinsta et les commandes `devkinsta-*`.
+- `.vscode/` fournit une intégration propre avec Windsurf / VS Code.
+
+Ce guide + le profil PowerShell + le thème TailPress + le dossier `.vscode` suffisent pour **recréer le même environnement** sur une autre machine Windows.
