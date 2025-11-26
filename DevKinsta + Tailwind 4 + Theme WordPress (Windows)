@@ -1,0 +1,435 @@
+============================================================
+DevKinsta + Tailwind 4 + Theme WordPress (Windows)
+Guide d'installation
+============================================================
+
+PREREQUIS
+------------------------------------------------------------
+1) Windows
+2) DevKinsta installe
+   - Les sites DevKinsta se trouvent ici :
+     Z:\data\docker\volumes\DevKinsta\public\MONSITE
+3) Node.js installe (version LTS recommande)
+4) PHP disponible dans C:\php
+   - Sinon, adapte le chemin $phpPath dans le script plus bas.
+
+------------------------------------------------------------
+1. OUVRIR LE PROFIL POWERSHELL
+------------------------------------------------------------
+
+1) Ouvre un terminal PowerShell.
+2) Tape :
+
+   notepad $PROFILE
+
+3) Si PowerShell demande de creer le fichier, accepte.
+
+4) Efface tout le contenu (Ctrl+A, Suppr).
+
+
+------------------------------------------------------------
+2. COLLER LE SCRIPT COMPLET DANS LE PROFIL
+------------------------------------------------------------
+
+1) Colle EXACTEMENT ce code dans le fichier ouvert par Notepad :
+
+   (debut du code)
+
+# ============================================================
+# DevKinsta + Tailwind Automation Profile (avec tutoriel)
+# ============================================================
+
+# --- PATH Configuration ---
+# Prepend PHP to PATH
+$phpPath = "C:\php"
+if ($env:PATH -notlike "*$phpPath*") {
+    $env:PATH = "$phpPath;$env:PATH"
+}
+
+# Ajouter le dossier npm global (%APPDATA%\npm) au PATH
+$npmGlobal = Join-Path $env:APPDATA "npm"
+if ($env:PATH -notlike "*$npmGlobal*") {
+    $env:PATH = "$npmGlobal;$env:PATH"
+}
+
+# --- Mount Z: drive if not already mounted ---
+function Mount-DevKinstaZ {
+    if (-not (Test-Path "Z:\")) {
+        try {
+            $result = net use Z: "\\wsl.localhost\docker-desktop-data" /persistent:yes 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "[OK] Z: drive mounted to \\wsl.localhost\docker-desktop-data" -ForegroundColor Green
+            } else {
+                Write-Host "[WARN] Could not mount Z: drive: $result" -ForegroundColor Yellow
+            }
+        } catch {
+            Write-Host "[WARN] Could not mount Z: drive: $_" -ForegroundColor Yellow
+        }
+    }
+}
+
+# --- Auto-mount Z: on profile load ---
+Mount-DevKinstaZ
+
+# --- Convert UNC path to Z: path ---
+function Convert-UNCToZ {
+    param([string]$Path)
+    
+    if ($Path -match "^\\\\wsl\.localhost\\docker-desktop-data(.*)$") {
+        return "Z:$($Matches[1])"
+    }
+    if ($Path -match "^Microsoft\.PowerShell\.Core\\FileSystem::\\\\wsl\.localhost\\docker-desktop-data(.*)$") {
+        return "Z:$($Matches[1])"
+    }
+    return $Path
+}
+
+# --- Switch to Z: if currently in UNC path ---
+function Switch-ToZDrive {
+    $currentPath = (Get-Location).Path
+    $providerPath = (Get-Location).ProviderPath
+    
+    if ($currentPath -match "wsl\.localhost\\docker-desktop-data" -or $providerPath -match "wsl\.localhost\\docker-desktop-data") {
+        $zPath = Convert-UNCToZ -Path $providerPath
+        if ((Test-Path $zPath) -and $zPath -ne $currentPath) {
+            Set-Location $zPath
+            Write-Host "[OK] Switched from UNC to Z: drive" -ForegroundColor Green
+            return $true
+        }
+    }
+    return $false
+}
+
+# ============================================================
+# Optionnel: installateur TailPress
+# ============================================================
+function devkinsta-tailpress-init {
+    param(
+        [string]$ThemeName = "tailpress"
+    )
+
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host " Initialisation TailPress pour DevKinsta" -ForegroundColor Cyan
+    Write-Host "========================================" -ForegroundColor Cyan
+
+    $siteRoot = (Get-Location).Path
+
+    if (-not (Test-Path (Join-Path $siteRoot "wp-content"))) {
+        Write-Host "[ERROR] Ce dossier ne ressemble pas a un site WordPress (wp-content manquant)." -ForegroundColor Red
+        Write-Host "Place-toi a la racine du site DevKinsta, ex. Z:\data\docker\volumes\DevKinsta\public\monsite" -ForegroundColor Yellow
+        return
+    }
+
+    $themesPath = Join-Path $siteRoot "wp-content\themes"
+    if (-not (Test-Path $themesPath)) {
+        New-Item -ItemType Directory -Path $themesPath | Out-Null
+    }
+
+    $themePath = Join-Path $themesPath $ThemeName
+
+    if (Test-Path $themePath) {
+        Write-Host "[INFO] Le theme '$ThemeName' existe deja ici :" -ForegroundColor Yellow
+        Write-Host "       $themePath"
+        Write-Host "[INFO] Si tu veux repartir de zero, supprime ce dossier manuellement puis relance la commande." -ForegroundColor Yellow
+        return
+    }
+
+    Write-Host "[RUNNING] git clone TailPress..." -ForegroundColor Blue
+    git clone https://github.com/jeffreyvr/tailpress.git $themePath
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[ERROR] git clone a echoue. Verifie ta connexion internet et git." -ForegroundColor Red
+        return
+    }
+
+    Push-Location $themePath
+    try {
+        if (Test-Path "composer.json") {
+            Write-Host "[INFO] composer.json detecte, tentative de composer install (optionnel)..." -ForegroundColor Yellow
+            composer install
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "[WARN] composer install a echoue, on continue quand meme (npm + Vite fonctionneront)." -ForegroundColor Yellow
+            }
+        }
+
+        if (Test-Path "package.json") {
+            Write-Host "[RUNNING] npm install..." -ForegroundColor Blue
+            npm install
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "[ERROR] npm install a echoue." -ForegroundColor Red
+                return
+            }
+
+            Write-Host "[RUNNING] npm run build (Vite)..." -ForegroundColor Blue
+            npm run build
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "[ERROR] npm run build a echoue." -ForegroundColor Red
+                return
+            }
+        }
+    }
+    finally {
+        Pop-Location
+    }
+
+    Write-Host "========================================" -ForegroundColor Green
+    Write-Host "[OK] TailPress installe dans :" -ForegroundColor Green
+    Write-Host "     $themePath" -ForegroundColor Green
+    Write-Host "========================================" -ForegroundColor Green
+    Write-Host "Etape suivante : va dans l'admin WordPress du site," -ForegroundColor Yellow
+    Write-Host "  Apparence > Themes, et active le theme 'TailPress'." -ForegroundColor Yellow
+}
+
+# ============================================================
+# Installateur de theme custom + Tailwind 4 (@tailwindcss/cli)
+# ============================================================
+function devkinsta-theme-init {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ThemeName
+    )
+
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host " Initialisation theme Tailwind 4 custom" -ForegroundColor Cyan
+    Write-Host "========================================" -ForegroundColor Cyan
+
+    $siteRoot = (Get-Location).Path
+
+    if (-not (Test-Path (Join-Path $siteRoot "wp-content"))) {
+        Write-Host "[ERROR] Ce dossier ne ressemble pas a un site WordPress (wp-content manquant)." -ForegroundColor Red
+        Write-Host "Place-toi a la racine du site DevKinsta, ex. Z:\data\docker\volumes\DevKinsta\public\monsite" -ForegroundColor Yellow
+        return
+    }
+
+    # slug pour dossiers / handles (peut contenir des tirets)
+    $themeSlug = ($ThemeName -replace '\s+', '-' -replace '[^a-zA-Z0-9\-]', '').ToLower()
+
+    if (-not $themeSlug) {
+        Write-Host "[ERROR] Nom de theme invalide." -ForegroundColor Red
+        return
+    }
+
+    # nom de fonction PHP: remplace les tirets par underscores
+    $themeFunc = ($themeSlug -replace '-', '_')
+
+    $themesPath = Join-Path $siteRoot "wp-content\themes"
+    if (-not (Test-Path $themesPath)) {
+        New-Item -ItemType Directory -Path $themesPath | Out-Null
+    }
+
+    $themePath = Join-Path $themesPath $themeSlug
+
+    if (Test-Path $themePath) {
+        Write-Host "[INFO] Le dossier de theme existe deja :" -ForegroundColor Yellow
+        Write-Host "       $themePath"
+        return
+    }
+
+    Write-Host "[RUNNING] Creation du theme '$ThemeName' ($themeSlug)..." -ForegroundColor Blue
+    New-Item -ItemType Directory -Path $themePath | Out-Null
+
+    Push-Location $themePath
+    try {
+@"
+/*
+Theme Name: $ThemeName
+Theme URI: https://example.com/
+Author: Toi
+Author URI: https://example.com/
+Description: Theme personnalise avec Tailwind CSS (v4).
+Version: 1.0.0
+Text Domain: $themeSlug
+*/
+"@ | Out-File -FilePath "style.css" -Encoding UTF8
+
+@"
+<?php
+get_header();
+?>
+<main>
+    <h1 class=\"text-3xl font-bold underline\">Hello from $ThemeName</h1>
+    <p>Edite ce theme dans wp-content/themes/$themeSlug</p>
+</main>
+<?php
+get_footer();
+"@ | Out-File -FilePath "index.php" -Encoding UTF8
+
+@"
+<?php
+?><!doctype html>
+<html <?php language_attributes(); ?>>
+<head>
+    <meta charset=\"<?php bloginfo( 'charset' ); ?>\" />
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
+    <?php wp_head(); ?>
+</head>
+<body <?php body_class(); ?>>
+<header class=\"p-4 bg-slate-900 text-white\">
+    <div class=\"container mx-auto\">
+        <h1 class=\"text-2l font-bold\"><?php bloginfo('name'); ?></h1>
+    </div>
+</header>
+"@ | Out-File -FilePath "header.php" -Encoding UTF8
+
+@"
+<footer class=\"p-4 bg-slate-100 mt-10\">
+    <div class=\"container mx-auto text-sm\">
+        &copy; <?php echo date('Y'); ?> <?php bloginfo('name'); ?>
+    </div>
+</footer>
+<?php wp_footer(); ?>
+</body>
+</html>
+"@ | Out-File -FilePath "footer.php" -Encoding UTF8
+
+@"
+<?php
+function ${themeFunc}_enqueue_assets() {
+    wp_enqueue_style(
+        '$themeSlug-css',
+        get_stylesheet_directory_uri() . '/dist/app.css',
+        array(),
+        file_exists( get_stylesheet_directory() . '/dist/app.css' ) ? filemtime( get_stylesheet_directory() . '/dist/app.css' ) : null
+    );
+}
+add_action( 'wp_enqueue_scripts', '${themeFunc}_enqueue_assets' );
+"@ | Out-File -FilePath "functions.php" -Encoding UTF8
+
+        New-Item -ItemType Directory -Path "assets" | Out-Null
+        New-Item -ItemType Directory -Path "assets\css" | Out-Null
+
+@"
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Ajoute tes styles custom ici */
+"@ | Out-File -FilePath "assets\css\app.css" -Encoding UTF8
+
+        Write-Host "[RUNNING] npm init -y..." -ForegroundColor Blue
+        npm init -y | Out-Null
+
+        Write-Host "[RUNNING] npm install -D tailwindcss @tailwindcss/cli postcss autoprefixer..." -ForegroundColor Blue
+        npm install -D tailwindcss @tailwindcss/cli postcss autoprefixer
+
+@"
+{
+  "name": "$themeSlug",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "npx @tailwindcss/cli -i ./assets/css/app.css -o ./dist/app.css --minify",
+    "dev": "npx @tailwindcss/cli -i ./assets/css/app.css -o ./dist/app.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^4.0.0",
+    "@tailwindcss/cli": "^4.0.0",
+    "postcss": "^8.4.0",
+    "autoprefixer": "^10.4.0"
+  }
+}
+"@ | Out-File -FilePath "package.json" -Encoding UTF8
+
+@"
+module.exports = {
+  content: ['./**/*.php'],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+"@ | Out-File -FilePath "tailwind.config.js" -Encoding UTF8
+
+@"
+module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+"@ | Out-File -FilePath "postcss.config.js" -Encoding UTF8
+
+        New-Item -ItemType Directory -Path "dist" -ErrorAction SilentlyContinue | Out-Null
+
+        Write-Host "[RUNNING] npm run build (Tailwind 4)..." -ForegroundColor Blue
+        npm run build
+    }
+    finally {
+        Pop-Location
+    }
+
+    Write-Host "========================================" -ForegroundColor Green
+    Write-Host "[OK] Theme cree dans :" -ForegroundColor Green
+    Write-Host "     $themePath" -ForegroundColor Green
+    Write-Host "========================================" -ForegroundColor Green
+    Write-Host "Etape suivante : va dans l'admin WordPress du site," -ForegroundColor Yellow
+    Write-Host "  Apparence > Themes, et active le theme '$ThemeName'." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Pour recompiler plus tard :" -ForegroundColor Yellow
+    Write-Host "  cd $themePath" -ForegroundColor White
+    Write-Host "  npm run build" -ForegroundColor White
+}
+
+# ============================================================
+# Tutoriel automatique a l'ouverture du terminal
+# ============================================================
+
+$null = Switch-ToZDrive
+
+$currentPath = (Get-Location).Path
+if ($currentPath -match "Z:\\data\\docker\\volumes\\DevKinsta\\public\\") {
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host " Tutoriel DevKinsta + Tailwind" -ForegroundColor Cyan
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host " 1) Pour creer un NOUVEAU THEME custom Tailwind:" -ForegroundColor Yellow
+    Write-Host "    devkinsta-theme-init \"Nom Du Theme\"" -ForegroundColor White
+    Write-Host ""
+    Write-Host " 2) Ensuite, dans WordPress:" -ForegroundColor Yellow
+    Write-Host "    Apparence > Themes > activer ce theme" -ForegroundColor White
+    Write-Host ""
+    Write-Host " 3) Pour RECOMPILER le CSS apres des changements:" -ForegroundColor Yellow
+    Write-Host "    cd wp-content\\themes\\<slug-du-theme>" -ForegroundColor White
+    Write-Host "    npm run build" -ForegroundColor White
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host ""
+}
+
+# Functions are automatically available in profile scope
+
+   (fin du code)
+
+2) Sauvegarde le fichier et ferme Notepad.
+
+3) Ferme le terminal PowerShell et rouvre-en un nouveau.
+
+
+------------------------------------------------------------
+3. UTILISER LA STACK SUR UN SITE DEVKINSTa
+------------------------------------------------------------
+
+1) Creer un nouveau site dans DevKinsta, par exemple : MONSITE.
+
+2) Dans PowerShell :
+
+   cd Z:\data\docker\volumes\DevKinsta\public\MONSITE
+   devkinsta-theme-init "Nom Du Theme"
+
+   - Cela va :
+     - Creer un theme dans wp-content\themes\nom-du-theme
+     - Installer Tailwind 4 + @tailwindcss/cli
+     - Lancer npm run build automatiquement
+
+3) Dans l'admin WordPress du site :
+   - Aller dans Apparence > Themes
+   - Activer "Nom Du Theme"
+
+4) Pour recompiler le CSS apres un changement dans assets\css\app.css :
+
+   cd Z:\data\docker\volumes\DevKinsta\public\MONSITE
+   cd wp-content\themes\nom-du-theme
+   npm run build
+
+============================================================
+FIN DU GUIDE
+============================================================
