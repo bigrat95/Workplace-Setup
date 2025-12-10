@@ -801,3 +801,96 @@ mon-theme/
 
 ## FIN DU GUIDE
 
+
+
+
+1️⃣ Optimiser WSL2 (le plus important)
+
+Crée ou édite le fichier :
+
+C:\Users\ton_nom\.wslconfig
+
+
+Mets exactement ceci dedans :
+
+[wsl2]
+memory=24GB
+processors=12
+swap=8GB
+localhostForwarding=true
+pageReporting=false
+nestedVirtualization=true
+
+
+Redémarre WSL :
+
+wsl --shutdown
+
+
+💡 Résultat : Docker + DevKinsta tournent à fond sans ralentir Windows.
+
+2️⃣ Activer l’accélération disque
+
+Ouvre Docker Desktop → Settings → Advanced
+
+Si dispo : coche Use VirtioFS accelerated file sharing
+
+Sinon : active WSL2 integration
+
+Partage uniquement ton dossier DevKinsta (limiter les dossiers = gros gain de performance)
+
+⚠️ Le partage Windows ↔ Docker est le point le plus lent.
+
+3️⃣ Désactiver Docker Resource Saver
+
+Docker Desktop → Resources → Resource Saver
+
+Décoche Enable Resource Saver
+
+💡 Les containers ne “dorment” plus → vitesse max.
+
+4️⃣ Mettre WSL Kernel et drivers à jour
+
+Exécute deux commandes :
+
+wsl --update
+winget upgrade --id Microsoft.WSL
+
+5️⃣ Optimiser WordPress dans DevKinsta
+
+Pour chaque site dev :
+
+Désactiver WooCommerce cart fragments
+
+Activer Object Cache Redis si possible
+
+Installer Query Monitor
+
+Éviter les page builders lourds
+
+Optionnel : BrowserSync OFF, minimiser les plugins actifs
+
+6️⃣ Mettre Apache/Nginx + MariaDB en “Performance Mode”
+
+Ouvre Docker Desktop → Containers → devkinsta_fpm → Console
+
+Lance ces commandes :
+
+wp rewrite flush --hard
+wp transient delete --all
+wp cache flush
+
+
+Optionnel mais plus puissant :
+
+Tuning MySQL/MariaDB buffer pool
+
+Activer OPcache preload
+
+🔥 Résultat attendu
+Avant	Après
+200–500ms TTFB local	50–100ms
+Build Tailwind lent	Turbo
+Lagg lors des enregistrements WP	Disparaît
+CPU Windows monte à 100%	Stable à 20–40%
+
