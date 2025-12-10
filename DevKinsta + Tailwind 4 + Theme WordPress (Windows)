@@ -430,6 +430,374 @@ if ($currentPath -match "Z:\\data\\docker\\volumes\\DevKinsta\\public\\") {
    cd wp-content\themes\nom-du-theme
    npm run build
 
-============================================================
-FIN DU GUIDE
-============================================================
+
+
+
+
+# ============================================================
+# DevKinsta + Tailwind 4 + WordPress Optimisé (Windows)
+# Guide d'installation COMPLET
+# ============================================================
+
+## PREREQUIS
+- Windows 10/11
+- DevKinsta installé
+- Docker Desktop installé
+- Node.js installé (version LTS)
+- Git installé
+- PHP installé dans C:\php (optionnel, pour composer)
+
+---
+
+## ETAPE 1 : CONFIGURER DOCKER DESKTOP (Performance)
+
+### 1.1 Modifier settings.json
+
+Ouvre PowerShell en Admin et exécute :
+
+```powershell
+$settingsPath = "$env:APPDATA\Docker\settings.json"
+$settings = Get-Content $settingsPath -Raw | ConvertFrom-Json
+
+# Adapter selon ta RAM (ici pour 32GB RAM)
+$settings.memoryMiB = 20480    # 20 GB
+$settings.cpus = 16            # 16 CPUs
+$settings.swapMiB = 4096       # 4 GB swap
+
+$json = $settings | ConvertTo-Json -Depth 10
+[System.IO.File]::WriteAllText($settingsPath, $json, [System.Text.UTF8Encoding]::new($false))
+
+Write-Host "Docker settings mis a jour" -ForegroundColor Green
+```
+
+### 1.2 Configurer WSL2
+
+```powershell
+$wslConfig = @"
+[wsl2]
+memory=20GB
+processors=16
+swap=4GB
+localhostForwarding=true
+"@
+
+$wslConfig | Set-Content "$env:USERPROFILE\.wslconfig" -Encoding ASCII
+Write-Host ".wslconfig cree" -ForegroundColor Green
+```
+
+### 1.3 Redémarrer Docker
+
+```powershell
+wsl --shutdown
+```
+
+Puis : Quit Docker Desktop → Relancer Docker Desktop
+
+---
+
+## ETAPE 2 : CONFIGURER LE PROFIL POWERSHELL
+
+### 2.1 Ouvrir le profil
+
+```powershell
+notepad $PROFILE
+```
+
+### 2.2 Coller ce script COMPLET
+
+```powershell
+
+
+# ============================================================
+# Optimiser wp-config.php d'un site DevKinsta
+# ============================================================
+function devkinsta-optimize-wp {
+    $siteRoot = (Get-Location).Path
+    $wpConfig = Join-Path $siteRoot "wp-config.php"
+    
+    if (-not (Test-Path $wpConfig)) {
+        Write-Host "[ERROR] wp-config.php non trouve. Place-toi a la racine du site." -ForegroundColor Red
+        return
+    }
+    
+    $content = Get-Content $wpConfig -Raw
+    
+    if ($content -notmatch "WP_MEMORY_LIMIT") {
+        $optimizations = @"
+
+/* === PERFORMANCE OPTIMIZATIONS === */
+define( 'WP_MEMORY_LIMIT', '512M' );
+define( 'WP_MAX_MEMORY_LIMIT', '512M' );
+define( 'WP_CACHE', true );
+define( 'CONCATENATE_SCRIPTS', true );
+define( 'COMPRESS_SCRIPTS', true );
+define( 'COMPRESS_CSS', true );
+/* === END OPTIMIZATIONS === */
+
+"@
+        $content = $content -replace "(<\?php)", "`$1$optimizations"
+        [System.IO.File]::WriteAllText($wpConfig, $content, [System.Text.UTF8Encoding]::new($false))
+        Write-Host "[OK] Optimisations WordPress ajoutees" -ForegroundColor Green
+    } else {
+        Write-Host "[INFO] Optimisations deja presentes" -ForegroundColor Yellow
+    }
+}
+
+# ============================================================
+# Installateur de theme custom + Tailwind 4
+# ============================================================
+function devkinsta-theme-init {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ThemeName
+    )
+
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host " Initialisation theme Tailwind 4 custom" -ForegroundColor Cyan
+    Write-Host "========================================" -ForegroundColor Cyan
+
+    $siteRoot = (Get-Location).Path
+
+    if (-not (Test-Path (Join-Path $siteRoot "wp-content"))) {
+        Write-Host "[ERROR] Ce dossier ne ressemble pas a un site WordPress." -ForegroundColor Red
+        Write-Host "Place-toi a la racine du site DevKinsta, ex. Z:\data\docker\volumes\DevKinsta\public\monsite" -ForegroundColor Yellow
+        return
+    }
+
+    $themeSlug = ($ThemeName -replace '\s+', '-' -replace '[^a-zA-Z0-9\-]', '').ToLower()
+    if (-not $themeSlug) {
+        Write-Host "[ERROR] Nom de theme invalide." -ForegroundColor Red
+        return
+    }
+
+    $themeFunc = ($themeSlug -replace '-', '_')
+    $themesPath = Join-Path $siteRoot "wp-content\themes"
+    if (-not (Test-Path $themesPath)) {
+        New-Item -ItemType Directory -Path $themesPath | Out-Null
+    }
+
+    $themePath = Join-Path $themesPath $themeSlug
+
+    if (Test-Path $themePath) {
+        Write-Host "[INFO] Le dossier de theme existe deja : $themePath" -ForegroundColor Yellow
+        return
+    }
+
+    Write-Host "[RUNNING] Creation du theme '$ThemeName' ($themeSlug)..." -ForegroundColor Blue
+    New-Item -ItemType Directory -Path $themePath | Out-Null
+
+    Push-Location $themePath
+    try {
+@"
+/*
+Theme Name: $ThemeName
+Theme URI: https://example.com/
+Author: Dev
+Author URI: https://example.com/
+Description: Theme personnalise avec Tailwind CSS v4.
+Version: 1.0.0
+Text Domain: $themeSlug
+*/
+"@ | Out-File -FilePath "style.css" -Encoding UTF8
+
+@"
+<?php
+get_header();
+?>
+<main class="container mx-auto p-4">
+    <h1 class="text-3xl font-bold underline">Hello from $ThemeName</h1>
+    <p class="mt-4">Edite ce theme dans wp-content/themes/$themeSlug</p>
+</main>
+<?php
+get_footer();
+"@ | Out-File -FilePath "index.php" -Encoding UTF8
+
+@"
+<?php
+?><!doctype html>
+<html <?php language_attributes(); ?>>
+<head>
+    <meta charset="<?php bloginfo( 'charset' ); ?>" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <?php wp_head(); ?>
+</head>
+<body <?php body_class(); ?>>
+<header class="p-4 bg-slate-900 text-white">
+    <div class="container mx-auto">
+        <h1 class="text-2xl font-bold"><?php bloginfo('name'); ?></h1>
+    </div>
+</header>
+"@ | Out-File -FilePath "header.php" -Encoding UTF8
+
+@"
+<footer class="p-4 bg-slate-100 mt-10">
+    <div class="container mx-auto text-sm">
+        &copy; <?php echo date('Y'); ?> <?php bloginfo('name'); ?>
+    </div>
+</footer>
+<?php wp_footer(); ?>
+</body>
+</html>
+"@ | Out-File -FilePath "footer.php" -Encoding UTF8
+
+@"
+<?php
+function ${themeFunc}_enqueue_assets() {
+    wp_enqueue_style(
+        '$themeSlug-css',
+        get_stylesheet_directory_uri() . '/dist/app.css',
+        array(),
+        file_exists( get_stylesheet_directory() . '/dist/app.css' ) ? filemtime( get_stylesheet_directory() . '/dist/app.css' ) : null
+    );
+}
+add_action( 'wp_enqueue_scripts', '${themeFunc}_enqueue_assets' );
+"@ | Out-File -FilePath "functions.php" -Encoding UTF8
+
+        New-Item -ItemType Directory -Path "assets\css" -Force | Out-Null
+
+@"
+@import "tailwindcss";
+
+/* Ajoute tes styles custom ici */
+"@ | Out-File -FilePath "assets\css\app.css" -Encoding UTF8
+
+        Write-Host "[RUNNING] npm init + install tailwindcss..." -ForegroundColor Blue
+        npm init -y | Out-Null
+        npm install -D tailwindcss @tailwindcss/cli
+
+@"
+{
+  "name": "$themeSlug",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "npx @tailwindcss/cli -i ./assets/css/app.css -o ./dist/app.css --minify",
+    "dev": "npx @tailwindcss/cli -i ./assets/css/app.css -o ./dist/app.css --watch"
+  }
+}
+"@ | Out-File -FilePath "package.json" -Encoding UTF8
+
+        New-Item -ItemType Directory -Path "dist" -ErrorAction SilentlyContinue | Out-Null
+
+        Write-Host "[RUNNING] npm run build..." -ForegroundColor Blue
+        npm run build
+    }
+    finally {
+        Pop-Location
+    }
+
+    Write-Host "========================================" -ForegroundColor Green
+    Write-Host "[OK] Theme cree dans : $themePath" -ForegroundColor Green
+    Write-Host "========================================" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "Prochaines etapes :" -ForegroundColor Yellow
+    Write-Host "  1. Active le theme dans WordPress > Apparence > Themes" -ForegroundColor White
+    Write-Host "  2. Pour recompiler: cd $themePath && npm run build" -ForegroundColor White
+    Write-Host "  3. Pour watch mode: cd $themePath && npm run dev" -ForegroundColor White
+}
+
+# ============================================================
+# Tutoriel auto
+# ============================================================
+$null = Switch-ToZDrive
+
+$currentPath = (Get-Location).Path
+if ($currentPath -match "Z:\\data\\docker\\volumes\\DevKinsta\\public\\") {
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host " DevKinsta + Tailwind 4" -ForegroundColor Cyan
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host " devkinsta-theme-init `"Nom Du Theme`"" -ForegroundColor White
+    Write-Host " devkinsta-optimize-wp" -ForegroundColor White
+    Write-Host "========================================" -ForegroundColor Cyan
+}
+```
+
+### 2.3 Sauvegarder et recharger
+
+Sauvegarde le fichier, ferme PowerShell, rouvre-le.
+
+---
+
+## ETAPE 3 : UTILISATION
+
+### 3.1 Créer un site dans DevKinsta
+
+1. Ouvre DevKinsta
+2. Crée un nouveau site (ex: "monsite")
+
+### 3.2 Initialiser le site
+
+```powershell
+# Aller au site
+cd Z:\data\docker\volumes\DevKinsta\public\monsite
+
+# Optimiser WordPress
+devkinsta-optimize-wp
+
+# Créer un thème Tailwind
+devkinsta-theme-init "Mon Super Theme"
+```
+
+### 3.3 Activer le thème
+
+1. Ouvre l'admin WordPress du site
+2. Apparence → Thèmes
+3. Active ton thème
+
+### 3.4 Développer
+
+```powershell
+# Pour recompiler le CSS après modifications
+cd Z:\data\docker\volumes\DevKinsta\public\monsite\wp-content\themes\mon-super-theme
+npm run build
+
+# Ou en mode watch (recompile auto)
+npm run dev
+```
+
+---
+
+## RESUME DES COMMANDES
+
+| Commande | Description |
+|----------|-------------|
+| `devkinsta-theme-init "Nom"` | Crée un thème Tailwind 4 |
+| `devkinsta-optimize-wp` | Optimise wp-config.php |
+| `npm run build` | Compile le CSS |
+| `npm run dev` | Mode watch (auto-compile) |
+
+---
+
+## CONFIGURATION DOCKER RECOMMANDÉE
+
+| RAM Total | memoryMiB | cpus | swapMiB |
+|-----------|-----------|------|---------|
+| 8 GB | 4096 | 4 | 2048 |
+| 16 GB | 10240 | 8 | 4096 |
+| 32 GB | 20480 | 16 | 4096 |
+
+---
+
+## STRUCTURE D'UN THEME TAILWIND
+
+```
+mon-theme/
+├── style.css           # Metadata WordPress
+├── index.php           # Template principal
+├── header.php          # Header
+├── footer.php          # Footer
+├── functions.php       # Enqueue CSS
+├── package.json        # Scripts npm
+├── assets/
+│   └── css/
+│       └── app.css     # Source Tailwind
+├── dist/
+│   └── app.css         # CSS compilé
+└── node_modules/
+```
+
+---
+
+## FIN DU GUIDE
+
