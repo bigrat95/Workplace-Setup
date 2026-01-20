@@ -1,0 +1,101 @@
+# Global Windsurf Rules
+
+## DevKinsta + WordPress + Tailwind CSS Workflow
+
+### Stack Detection
+- **Environment**: DevKinsta (Docker-based WordPress on Windows)
+- **Location**: `\\wsl.localhost\docker-desktop-data\data\docker\volumes\DevKinsta\public\[SITE_NAME]`
+- **Themes**: `wp-content/themes/[theme-slug]/`
+- **Tailwind Version**: v4 with `@tailwindcss/cli`
+
+### Critical Rules
+
+#### 1. **Always Compile Tailwind CSS**
+When working on a WordPress site using Tailwind CSS (with `package.json` and `npm run build`):
+- **NEVER use inline CSS** (`style="..."`) for styling that can be done with Tailwind classes
+- **ALWAYS compile CSS** after adding/modifying Tailwind classes
+- Run `npm run build` in the theme directory after making changes
+
+**Exception**: If the site uses Tailwind CDN (e.g., "la maison" site with `<script src="https://cdn.tailwindcss.com">`), you can skip compilation as it's client-side rendered.
+
+#### 2. **Build Process on Windows**
+Windows CMD/PowerShell **cannot use UNC paths** (`\\wsl.localhost\...`) as working directories for `npm` commands.
+
+**Required workflow**:
+```powershell
+# Map Z: drive to theme directory first
+net use Z: "\\wsl.localhost\docker-desktop-data\data\docker\volumes\DevKinsta\public\[SITE]\wp-content\themes\[theme-slug]" /persistent:no
+
+# Then build from Z: drive
+cd Z:
+npm run build
+```
+
+Or user maps Z: manually and runs:
+```powershell
+cd wp-content\themes\[theme-slug]
+npm run build
+```
+
+#### 3. **Theme Creation**
+To create a new Tailwind theme:
+```powershell
+cd Z:\data\docker\volumes\DevKinsta\public\[SITE_NAME]
+devkinsta-theme-init "Theme Name"
+```
+
+This automatically:
+- Creates theme structure
+- Installs Tailwind v4 + `@tailwindcss/cli`
+- Runs initial `npm run build`
+
+#### 4. **Development Workflow**
+```powershell
+# Build once (minified)
+npm run build
+
+# Watch mode (auto-recompile on changes)
+npm run dev
+```
+
+### Theme Structure
+```
+theme-slug/
+├── style.css           # WordPress theme metadata
+├── index.php           # Main template
+├── header.php
+├── footer.php
+├── functions.php       # Enqueues dist/app.css
+├── package.json        # npm scripts
+├── assets/
+│   └── css/
+│       └── app.css     # Tailwind source (@import "tailwindcss")
+├── dist/
+│   └── app.css         # Compiled CSS (enqueued in WordPress)
+└── template-parts/     # Custom templates/sections
+```
+
+### Key Commands in package.json
+```json
+{
+  "scripts": {
+    "build": "npx @tailwindcss/cli -i ./assets/css/app.css -o ./dist/app.css --minify",
+    "dev": "npx @tailwindcss/cli -i ./assets/css/app.css -o ./dist/app.css --watch"
+  }
+}
+```
+
+### PowerShell Profile Functions
+User has these functions available:
+- `devkinsta-theme-init "Theme Name"` - Create new Tailwind theme
+- `devkinsta-optimize-wp` - Optimize wp-config.php
+- `Mount-DevKinstaZ` - Mount Z: drive
+- `Switch-ToZDrive` - Convert UNC to Z: path
+
+### Remember
+- ✅ Detect if site uses Tailwind with npm (check `package.json`)
+- ✅ Always compile after Tailwind class changes
+- ✅ Use Tailwind classes instead of inline styles
+- ✅ Remind to compile if cannot run command due to UNC path issues
+- ❌ Never use inline CSS for styling that Tailwind can handle
+- ❌ Don't compile for Tailwind CDN sites
